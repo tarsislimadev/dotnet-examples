@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Readtext.Packaging/">
+    <Project Path="Readtext.Packaging/Readtext.PackagingProject.csproj" />
+  </Folder>
+  <Project Path="readtext.csproj" />
+</Solution>

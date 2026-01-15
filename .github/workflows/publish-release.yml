@@ -1,0 +1,86 @@
+name: Build and Publish .NET App to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      src_path:
+        description: 'Path to the .NET project directory (e.g., src/readtext)'
+        required: true
+        default: 'src/readtext' # Provide a default for convenience
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x' # Use the latest .NET 8.0 SDK
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ inputs.src_path }}
+
+    - name: Build project
+      run: dotnet build ${{ inputs.src_path }} --configuration Release --no-restore
+
+    - name: Publish project
+      run: dotnet publish ${{ inputs.src_path }} --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ${{ github.workspace }}/out
+      # The output directory is set to 'out' at the root of the workspace to easily upload as artifact.
+      # The executable name will be derived from the project name.
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-output # Use a generic name for the artifact
+        path: ${{ github.workspace }}/out/ # Upload the entire 'out' directory
+
+  publish-release:
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write # To create and upload to a release
+    if: github.ref == 'refs/heads/main' # Only publish from main branch
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: build-output
+        path: ./build-output
+
+    - name: Get project name
+      id: get_project_name
+      run: |
+        $projectPath = "${{ github.event.inputs.src_path }}"
+        $projectName = ($projectPath.Split('/') | Select-Object -Last 1)
+        echo "project_name=$projectName" >> $env:GITHUB_OUTPUT
+      shell: pwsh
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}-${{ steps.get_project_name.outputs.project_name }}
+        release_name: Release v${{ github.run_number }} for ${{ steps.get_project_name.outputs.project_name }}
+        body: |
+          Automated release for `${{ steps.get_project_name.outputs.project_name }}` project.
+          Built from commit ${{ github.sha }}.
+        draft: false # Set to false to publish directly
+        prerelease: false
+
+    - name: Upload Release Asset
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./build-output/${{ steps.get_project_name.outputs.project_name }}.exe
+        asset_name: ${{ steps.get_project_name.outputs.project_name }}.exe
+        asset_content_type: application/octet-stream
