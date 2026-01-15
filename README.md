@@ -8,9 +8,21 @@ Install .NET 8
 sudo apt install -y dotnet8
 ```
 
+Enter path
+
+```bash
+cd ./readtext/
+```
+
+Run using .NET
+
+```bash
+dotnet run
+```
+
 ## examples
 
-...
+[Read Text](./readtext/README.md)
 
 ## license
 
