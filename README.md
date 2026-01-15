@@ -1,4 +1,4 @@
-# dotnet examples
+# .NET examples
 
 ## how to run examples
 
